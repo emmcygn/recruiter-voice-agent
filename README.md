@@ -6,7 +6,7 @@ This repository demonstrates the technical and strategic framework required to d
 
 ---
 
-## 🎯 Project Intent
+## Project Intent
 
 The objective of this demo is to prove that voice AI can be both **deterministic** and **highly observable**. Built as a "Founding Solutions Engineer" demonstration, it emphasizes clean system boundaries, backend-validated actions, and a consultative approach to deployment.
 
@@ -18,7 +18,7 @@ The objective of this demo is to prove that voice AI can be both **deterministic
 
 ---
 
-## 🏗️ System Architecture
+## System Architecture
 
 The system is partitioned into three distinct layers to ensure scalability and maintainability.
 
@@ -37,16 +37,16 @@ The system is partitioned into three distinct layers to ensure scalability and m
 
 ---
 
-## 🛠️ Key Features
+## Key Features
 
-- **✅ Live Appointment Booking**: End-to-end flow from phone greeting to spoke booking reference.
-- **✅ Business Knowledge-Aware**: The agent is trained on SwitchedOn's real pricing (£99-109/hr), South West London coverage, and core services (Plumbing, Electrical, Heating).
-- **✅ Robust Communication**: Native support for NATO phonetics for postcodes, proactive name spelling, and 2026 date normalization.
-- **✅ Safety & Escalation**: Automatic detection of misunderstanding or human-agent requests with graceful handover logging.
+- **Live Appointment Booking**: End-to-end flow from phone greeting to spoke booking reference.
+- **Business Knowledge-Aware**: The agent is trained on SwitchedOn's real pricing (£99-109/hr), South West London coverage, and core services (Plumbing, Electrical, Heating).
+- **Robust Communication**: Native support for NATO phonetics for postcodes, proactive name spelling, and 2026 date normalization.
+- **Safety & Escalation**: Automatic detection of misunderstanding or human-agent requests with graceful handover logging.
 
 ---
 
-## 📂 Documentation Index
+## Documentation Index
 
 Strategic documentation designed for client-facing deployment:
 
@@ -57,7 +57,7 @@ Strategic documentation designed for client-facing deployment:
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
 - Python 3.8+
@@ -87,7 +87,7 @@ The server will start at `http://localhost:8000`.
 
 ---
 
-## 🔍 API Interface
+## API Interface
 
 - **`POST /attempt-booking`**: Primary orchestration endpoint (called by Retell).
 - **`GET /calls`**: Retrieve all historical call records and transcripts.
@@ -96,7 +96,7 @@ The server will start at `http://localhost:8000`.
 
 ---
 
-## 📈 Strategic Deferrals (Future Roadmap)
+## Strategic Deferrals (Future Roadmap)
 
 To maintain demo confidence, the following are explicitly scoped for post-MVP rollout:
 - **Cal.com Integration**: Real-time calendar writes via API.
@@ -105,6 +105,6 @@ To maintain demo confidence, the following are explicitly scoped for post-MVP ro
 
 ---
 
-## ⚖️ License
+## License
 
-Demo project for professional assessment purposes. Built by **Founding Solutions Engineer Candidate**.
+Demo project for professional assessment purposes. Built by **Emmanuel Cuyugan**.
