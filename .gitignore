@@ -49,3 +49,6 @@ desktop.ini
 # Environment variables
 .env
 .env.local
+voice_agents_demo/PORT_DIAGNOSTIC.md
+# Server logs
+voice_agents_demo/server.log

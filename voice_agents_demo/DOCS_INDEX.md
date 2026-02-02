@@ -22,6 +22,22 @@ Use this to find things fast without re-searching.
 
 ---
 
+## 🏢 For Business Stakeholders
+
+**Want to understand what this does without reading code?**
+
+1. **Read**: `README.md` (The "Why" and strategic vision)
+2. **Read**: `ONBOARDING.md` (How we'd deploy this for you in 4 weeks)
+3. **Read**: `QUALITY_MONITORING.md` (How we'd measure success and tool selection)
+4. **Skim**: `retell_agent_prompt.md` (The "personality" and rules of the agent)
+5. **Skim**: `FAILURE_MODES.md` (How we handle risks and edge cases)
+
+**Want to see it work?**
+- Request a live demo using the `DEMO_PLAYBOOK.md` script.
+- Try the interactive text session via `demo_simulator.py`.
+
+---
+
 ## Retell AI Official Documentation
 
 ### Getting Started

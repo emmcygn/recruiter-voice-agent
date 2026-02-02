@@ -4,6 +4,17 @@ A production-shaped demonstration of a **Single-Prompt Voice AI Agent** designed
 
 This repository demonstrates the technical and strategic framework required to deploy reliable, deterministic voice agents in a high-stakes service business environment.
 
+## 🚀 Why This Matters
+
+Voice AI fails when it's treated as a "chatbot with speech." This demo proves that **deterministic, backend-validated voice agents** can handle real business workflows.
+
+Built as a **Founding Solutions Engineer** demonstration, this system emphasizes:
+- **Consultative Deployment**: 6-phase onboarding process focusing on business value first.
+- **Observability**: Every decision is logged, traceable, and ready for QA auditing.
+- **Risk Mitigation**: Explicit failure mode analysis and multi-tier escalation paths.
+
+This isn't just code — it's a deployment framework.
+
 ---
 
 ## Project Intent
@@ -52,6 +63,8 @@ Strategic documentation designed for client-facing deployment:
 
 - **[ONBOARDING.md](voice_agents_demo/ONBOARDING.md)**: A 6-phase framework for taking a client from Discovery to Full Rollout.
 - **[QUALITY_MONITORING.md](voice_agents_demo/QUALITY_MONITORING.md)**: A comprehensive strategy for monitoring KPIs, sentiment, and transcript accuracy.
+- **[FAILURE_MODES.md](voice_agents_demo/FAILURE_MODES.md)**: Proactive identification of risks and their technical/operational mitigations.
+- **[DEMO_PLAYBOOK.md](voice_agents_demo/DEMO_PLAYBOOK.md)**: Structured guide for conducting high-impact sales demonstrations.
 - **[SPECIFICATION.md](voice_agents_demo/SPECIFICATION.md)**: The authoritative technical specification and design constraints.
 - **[STATUS.md](voice_agents_demo/STATUS.md)**: Current build state, test results, and implementation roadmap.
 
@@ -82,6 +95,10 @@ DEMO_MODE=true python main.py
 
 # Run in Normal Mode (simulated reality)
 python main.py
+
+# Run Interactive Demo (Simulator)
+# Allows testing the agent logic without Retell credentials
+python demo_simulator.py
 ```
 The server will start at `http://localhost:8000`.
 
