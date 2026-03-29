@@ -1,127 +1,92 @@
-# SwitchedOn London — Demo-Grade Voice Agent System
+# Voice AI Candidate Screening Agent
 
-A production-shaped demonstration of a **Single-Prompt Voice AI Agent** designed for SwitchedOn London, leveraging **Retell AI** and a **FastAPI** orchestration backend.
+A production-shaped demonstration of a **voice AI agent** that conducts structured candidate screening interviews for software engineering roles.
 
-This repository demonstrates the technical and strategic framework required to deploy reliable, deterministic voice agents in a high-stakes service business environment.
+Built with **Retell AI** (voice layer) and **FastAPI** (orchestration backend). The agent asks 5 structured questions, scores responses via deterministic keyword extraction, and persists structured JSON scorecards.
 
-## 🚀 Why This Matters
+## Why This Approach
 
-Voice AI fails when it's treated as a "chatbot with speech." This demo proves that **deterministic, backend-validated voice agents** can handle real business workflows.
+Voice AI in recruitment fails when it's treated as a chatbot with speech. This system proves that **deterministic, backend-validated voice agents** can deliver structured, auditable screening at scale.
 
-Built as a **Founding Solutions Engineer** demonstration, this system emphasizes:
-- **Consultative Deployment**: 6-phase onboarding process focusing on business value first.
-- **Observability**: Every decision is logged, traceable, and ready for QA auditing.
-- **Risk Mitigation**: Explicit failure mode analysis and multi-tier escalation paths.
-
-This isn't just code — it's a deployment framework.
-
----
-
-## Project Intent
-
-The objective of this demo is to prove that voice AI can be both **deterministic** and **highly observable**. Built as a "Founding Solutions Engineer" demonstration, it emphasizes clean system boundaries, backend-validated actions, and a consultative approach to deployment.
-
-### Core Principles
-- **Backend as Source of Truth**: The agent never confirms a booking without explicit confirmation from the logic layer. No hallucinations.
-- **Reliability over Breadth**: High confidence in core booking flows over a wide range of half-baked features.
-- **Observability First**: Every interaction, decision, and transcript is persisted and inspectable.
-- **Demo-Grade Polish**: Optimized for reproducible, predictable live demonstrations via a dedicated `DEMO_MODE`.
-
----
-
-## System Architecture
-
-The system is partitioned into three distinct layers to ensure scalability and maintainability.
-
-### 1. Voice Layer (Retell AI)
-- **Single-Prompt Strategy**: Predictable conversational flow without the complexity of state-machine-heavy alternatives.
-- **Deterministic Slot Filling**: Robust extraction of PII (Name, Phone) and service details.
-- **Real-Time Tooling**: Mid-call custom functions allow the agent to "act" (check availability/book) while the customer is on the line.
-
-### 2. Orchestration Layer (FastAPI)
-- **Booking Hub**: Validates required slots and executes business logic.
-- **Webhook Integration**: Captures post-call lifecycle events and final transcripts.
-- **Simulation Engine**: Supports deterministic booking references and success rates for demo environments.
-
-### 3. Persistence Layer
-- **Structured Logging**: Every call is stored in `calls.json` with full metadata, transcripts, and backend decision traces.
-
----
-
-## Key Features
-
-- **Live Appointment Booking**: End-to-end flow from phone greeting to spoke booking reference.
-- **Business Knowledge-Aware**: The agent is trained on SwitchedOn's real pricing (£99-109/hr), South West London coverage, and core services (Plumbing, Electrical, Heating).
-- **Robust Communication**: Native support for NATO phonetics for postcodes, proactive name spelling, and 2026 date normalization.
-- **Safety & Escalation**: Automatic detection of misunderstanding or human-agent requests with graceful handover logging.
-
----
-
-## Documentation Index
-
-Strategic documentation designed for client-facing deployment:
-
-- **[ONBOARDING.md](voice_agents_demo/ONBOARDING.md)**: A 6-phase framework for taking a client from Discovery to Full Rollout.
-- **[QUALITY_MONITORING.md](voice_agents_demo/QUALITY_MONITORING.md)**: A comprehensive strategy for monitoring KPIs, sentiment, and transcript accuracy.
-- **[FAILURE_MODES.md](voice_agents_demo/FAILURE_MODES.md)**: Proactive identification of risks and their technical/operational mitigations.
-- **[DEMO_PLAYBOOK.md](voice_agents_demo/DEMO_PLAYBOOK.md)**: Structured guide for conducting high-impact sales demonstrations.
-- **[SPECIFICATION.md](voice_agents_demo/SPECIFICATION.md)**: The authoritative technical specification and design constraints.
-- **[STATUS.md](voice_agents_demo/STATUS.md)**: Current build state, test results, and implementation roadmap.
-
----
+- **Backend as Source of Truth**: The agent never confirms outcomes without explicit backend validation
+- **Deterministic Scoring**: Keyword-based extraction, no LLM scoring — observable and reproducible
+- **Observability First**: Every screening is persisted with per-question scores, rationales, and full transcript
+- **GDPR-Aware**: Consent collection built into the call flow
 
 ## Quick Start
 
-### Prerequisites
-- Python 3.8+
-- Retell AI API Key (for live integration)
-
-### Installation
 ```bash
-# Clone the repository
-git clone <repo-url>
-cd voice_demo
-
 # Install dependencies
 pip install -r voice_agents_demo/requirements.txt
+
+# Run in Demo Mode (deterministic scores, always passes)
+cd voice_agents_demo && DEMO_MODE=true python main.py
+
+# Run in Normal Mode (keyword-based scoring)
+cd voice_agents_demo && python main.py
+
+# Run tests
+cd voice_agents_demo && python -m pytest test_screening.py -v
 ```
 
-### Running the Backend
-```bash
-cd voice_agents_demo
+The server starts at `http://localhost:8000`.
 
-# Run in Demo Mode (deterministic references, 100% success rate)
-DEMO_MODE=true python main.py
+## API Endpoints
 
-# Run in Normal Mode (simulated reality)
-python main.py
+| Method | Path | Purpose |
+|---|---|---|
+| `POST /submit-screening` | Submit candidate screening for scoring | Core endpoint |
+| `GET /screenings` | List all screening scorecards | |
+| `GET /screenings/{id}` | Get a single scorecard by ID | |
+| `POST /retell/function` | Retell mid-call custom function handler | Called by voice agent |
+| `POST /webhook/retell` | Retell post-call webhook | Logs transcripts |
+| `GET /health` | Health check | |
 
-# Run Interactive Demo (Simulator)
-# Allows testing the agent logic without Retell credentials
-python demo_simulator.py
-```
-The server will start at `http://localhost:8000`.
+## Screening Flow
 
----
+1. Voice agent greets candidate, collects GDPR consent
+2. Asks 5 structured questions: Experience, Tech Stack, Problem-Solving, Collaboration, Availability
+3. Calls `submit_screening` custom function with answers
+4. Backend scores each answer via keyword extraction (1-5 scale)
+5. Returns overall pass/flag/fail status with per-question rationales
+6. Agent reads confirmation to candidate
+7. Post-call webhook logs full transcript
 
-## API Interface
+## Scoring Model
 
-- **`POST /attempt-booking`**: Primary orchestration endpoint (called by Retell).
-- **`GET /calls`**: Retrieve all historical call records and transcripts.
-- **`GET /health`**: System health check.
-- **`POST /webhook/retell`**: Post-call event processing.
+Each answer is scored 1-5 based on keyword matching:
 
----
+- **Experience**: Years parsed + title keywords (senior/lead/staff)
+- **Tech Stack**: Count of recognized technologies against target list
+- **Problem-Solving**: Methodology signal words (debugged, profiled, tested, etc.)
+- **Collaboration**: Collaboration keywords (pair, review, PR, retro, etc.)
+- **Availability**: Notice period parsing (immediate → 3+ months)
 
-## Strategic Deferrals (Future Roadmap)
+**Overall status**: pass (avg >= 3.5), flag (avg >= 2.5), fail (avg < 2.5)
 
-To maintain demo confidence, the following are explicitly scoped for post-MVP rollout:
-- **Cal.com Integration**: Real-time calendar writes via API.
-- **SMS/Email Notifications**: Post-booking confirmation delivery.
-- **Performance Dashboard**: Visualization of Retell analytics and backend KPIs.
+## Environment Variables
 
----
+| Variable | Purpose | Default |
+|---|---|---|
+| `DEMO_MODE` | Deterministic scores, always passes | `false` |
 
-## License
+## Extension Points (Not Built)
 
-Demo project for professional assessment purposes. Built by **Emmanuel Cuyugan**.
+The `/retell/function` endpoint routes by function name. Adding new agent modes requires: a new Retell prompt, a new function handler, and new Pydantic models.
+
+### GDPR Consent Agent
+Outbound call to collect explicit data retention opt-in. Function: `submit_consent`, Endpoint: `POST /submit-consent`.
+
+### No-Show Confirmation Agent
+Day-before call to confirm interview attendance and flag no-show risk. Function: `submit_confirmation`, Endpoint: `POST /submit-confirmation`.
+
+## Tech Stack
+
+- **Voice**: Retell AI (single-prompt agent, custom functions, webhooks)
+- **Backend**: Python, FastAPI, Pydantic v2
+- **Persistence**: Flat JSON file (`screenings.json`)
+- **Testing**: pytest
+
+## Related
+
+- [talent-tool-mvp](https://github.com/emmcygn/talent-tool-mvp) — AI-powered recruitment platform with candidate matching, scoring, and pipeline management
