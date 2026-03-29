@@ -1,5 +1,46 @@
 import re
 
+# Spoken number words to digits
+WORD_TO_NUM = {
+    "zero": 0, "one": 1, "two": 2, "three": 3, "four": 4, "five": 5,
+    "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10,
+    "eleven": 11, "twelve": 12, "thirteen": 13, "fourteen": 14, "fifteen": 15,
+    "sixteen": 16, "seventeen": 17, "eighteen": 18, "nineteen": 19, "twenty": 20,
+    "thirty": 30, "forty": 40, "fifty": 50, "sixty": 60, "seventy": 70,
+    "eighty": 80, "ninety": 90, "hundred": 100,
+}
+
+
+def _parse_spoken_number(text: str) -> int:
+    """Parse spoken numbers like 'seventy five' -> 75, 'three' -> 3."""
+    words = text.split()
+    total = 0
+    current = 0
+    found_any = False
+
+    for word in words:
+        word = word.strip(",").lower()
+        if word in WORD_TO_NUM:
+            found_any = True
+            val = WORD_TO_NUM[word]
+            if val == 100:
+                current = (current if current else 1) * 100
+            elif val >= 10 and val <= 90 and val % 10 == 0:
+                current += val
+            else:
+                current += val
+        elif word == "thousand":
+            found_any = True
+            current = (current if current else 1) * 1000
+            total += current
+            current = 0
+        elif found_any:
+            # Stop when we hit a non-number word after finding numbers
+            break
+
+    total += current
+    return total if found_any else 0
+
 
 def score_experience(answer: str) -> dict:
     """Score experience answer based on years and title keywords."""
@@ -7,6 +48,7 @@ def score_experience(answer: str) -> dict:
     score = 1
     rationale_parts = []
 
+    # Try digit-based patterns first
     year_patterns = [
         r'(\d+)\+?\s*years?',
         r'(\d+)\+?\s*yrs?',
@@ -17,6 +59,12 @@ def score_experience(answer: str) -> dict:
         if match:
             years = int(match.group(1))
             break
+
+    # Try spoken number patterns: "three years", "twenty years"
+    if years == 0:
+        spoken_match = re.search(r'((?:\w+\s+){1,3})years?', text)
+        if spoken_match:
+            years = _parse_spoken_number(spoken_match.group(1))
 
     if years >= 5:
         score = 5
@@ -188,6 +236,11 @@ def _extract_salary(text: str) -> int:
     match = re.search(r'[£$]?\s*(\d{2,3})\s*k\b', text)
     if match:
         return int(match.group(1)) * 1000
+
+    # Spoken numbers: "seventy five thousand", "eighty thousand"
+    spoken = _parse_spoken_number(text)
+    if spoken >= 20000:  # Only accept as salary if >= 20k
+        return spoken
 
     return 0
 

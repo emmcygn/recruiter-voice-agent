@@ -33,6 +33,14 @@ class TestScoreExperience:
         result = score_experience("I'm a lead engineer with 3 years experience")
         assert result["score"] == 5  # 4 (3 years) + 1 (lead) = 5
 
+    def test_spoken_three_years(self):
+        result = score_experience("I've been working for three years and my current role is with a startup")
+        assert result["score"] == 4
+
+    def test_spoken_ten_years(self):
+        result = score_experience("I have ten years of experience as a software engineer")
+        assert result["score"] == 5
+
 
 class TestScoreTechStack:
     def test_strong_stack(self):
@@ -108,12 +116,22 @@ class TestScoreCurrentSalary:
         result = score_current_salary("It varies a lot")
         assert result["score"] == 1
 
+    def test_spoken_salary(self):
+        result = score_current_salary("I'm at seventy five thousand")
+        assert result["score"] == 5
+        assert "75,000" in result["rationale"]
+
 
 class TestScoreTargetSalary:
     def test_target_with_k(self):
         result = score_target_salary("I'm looking for at least 95k")
         assert result["score"] == 5
         assert "95,000" in result["rationale"]
+
+    def test_spoken_target(self):
+        result = score_target_salary("I would be hoping for eighty thousand")
+        assert result["score"] == 5
+        assert "80,000" in result["rationale"]
 
     def test_negotiable(self):
         result = score_target_salary("I'm pretty open and flexible on salary")
