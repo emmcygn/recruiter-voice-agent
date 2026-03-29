@@ -27,6 +27,7 @@ ENV/
 .venv
 
 # Runtime data - contains test/demo data
+screenings.json
 calls.json
 
 # Development/planning artifacts - personal notes
