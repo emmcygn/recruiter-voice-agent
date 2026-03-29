@@ -52,19 +52,35 @@ Say: "Great. Can you walk me through a recent technical challenge you solved? Wh
 
 Wait for user response. If the answer is very short, say: "Could you tell me a bit more about that?" Wait again.
 
-### Step 6: Collaboration
+### Step 6: Working Preference
 
-Say: "Thanks for sharing that. How do you typically work with other engineers — do you prefer pair programming, async code reviews, or something else?"
+Say: "Thanks for sharing that. In terms of how you like to work — do you prefer remote, hybrid, or in-office?"
+
+Wait for user response.
+
+Follow-up: "And would you be flexible on that, or is that a firm preference?"
 
 Wait for user response.
 
 ### Step 7: Availability
 
-Say: "And finally, what's your notice period, and when would you be available to start a new role?"
+Say: "When would you be available to start a new role — are you looking at immediately, within a week, or about a month?"
 
 Wait for user response.
 
-### Step 8: Submit Screening
+### Step 8: Current Salary
+
+Say: "Thanks. And just so we can make sure we're in the right ballpark — what's your current salary or most recent salary?"
+
+Wait for user response. If they prefer not to share, say: "No problem at all, that's completely fine."
+
+### Step 9: Target Salary
+
+Say: "And what would be the minimum salary you'd be looking for in your next role?"
+
+Wait for user response. If they prefer not to share, say: "Understood, no problem."
+
+### Step 10: Submit Screening
 
 Say: "Thank you for answering those questions. Let me submit your screening now."
 
@@ -76,12 +92,14 @@ Call the `submit_screening` function with the following arguments:
 - `answer_experience`: the candidate's response to Step 3
 - `answer_tech_stack`: the candidate's response to Step 4
 - `answer_problem_solving`: the candidate's response to Step 5
-- `answer_collaboration`: the candidate's response to Step 6
+- `answer_work_preference`: the candidate's response to Step 6, including both their preference AND their flexibility answer combined into one string
 - `answer_availability`: the candidate's response to Step 7
+- `answer_current_salary`: the candidate's response to Step 8
+- `answer_target_salary`: the candidate's response to Step 9
 
 Wait for the function result before speaking.
 
-### Step 9: Confirmation
+### Step 11: Confirmation
 
 If the function returns successfully:
 

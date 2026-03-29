@@ -13,8 +13,10 @@ from scorer import (
     score_experience,
     score_tech_stack,
     score_problem_solving,
-    score_collaboration,
+    score_work_preference,
     score_availability,
+    score_current_salary,
+    score_target_salary,
     compute_overall,
 )
 
@@ -39,8 +41,10 @@ class ScreeningAnswers(BaseModel):
     experience: str
     tech_stack: str
     problem_solving: str
-    collaboration: str
+    work_preference: str
     availability: str
+    current_salary: str
+    target_salary: str
 
 
 class ScreeningSubmission(BaseModel):
@@ -132,13 +136,15 @@ async def submit_screening(submission: ScreeningSubmission):
             "role_applied": submission.role_applied,
             "consent_given": True,
             "overall_status": "pass",
-            "overall_score": 4.6,
+            "overall_score": 4.9,
             "scores": {
                 "experience": {"score": 5, "rationale": "Senior-level, 5+ years"},
                 "tech_stack": {"score": 5, "rationale": "5+ matching technologies"},
                 "problem_solving": {"score": 4, "rationale": "Clear methodology described"},
-                "collaboration": {"score": 4, "rationale": "Strong collaboration signals"},
-                "availability": {"score": 5, "rationale": "Available within 1 month"},
+                "work_preference": {"score": 5, "rationale": "Prefers hybrid, flexible"},
+                "availability": {"score": 5, "rationale": "Available immediately"},
+                "current_salary": {"score": 5, "rationale": "Current salary: £85,000"},
+                "target_salary": {"score": 5, "rationale": "Target floor salary: £95,000"},
             },
             "transcript": submission.transcript,
             "demo_mode": True,
@@ -148,8 +154,10 @@ async def submit_screening(submission: ScreeningSubmission):
             "experience": score_experience(submission.answers.experience),
             "tech_stack": score_tech_stack(submission.answers.tech_stack),
             "problem_solving": score_problem_solving(submission.answers.problem_solving),
-            "collaboration": score_collaboration(submission.answers.collaboration),
+            "work_preference": score_work_preference(submission.answers.work_preference),
             "availability": score_availability(submission.answers.availability),
+            "current_salary": score_current_salary(submission.answers.current_salary),
+            "target_salary": score_target_salary(submission.answers.target_salary),
         }
         overall = compute_overall(scores)
         scorecard = {
@@ -213,8 +221,10 @@ async def retell_custom_function(request: Request):
                 "experience": args.get("answer_experience", ""),
                 "tech_stack": args.get("answer_tech_stack", ""),
                 "problem_solving": args.get("answer_problem_solving", ""),
-                "collaboration": args.get("answer_collaboration", ""),
+                "work_preference": args.get("answer_work_preference", ""),
                 "availability": args.get("answer_availability", ""),
+                "current_salary": args.get("answer_current_salary", ""),
+                "target_salary": args.get("answer_target_salary", ""),
             },
             transcript=call_info.get("transcript", ""),
         )

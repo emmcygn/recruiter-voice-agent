@@ -3,8 +3,10 @@ from scorer import (
     score_experience,
     score_tech_stack,
     score_problem_solving,
-    score_collaboration,
+    score_work_preference,
     score_availability,
+    score_current_salary,
+    score_target_salary,
     compute_overall,
 )
 
@@ -67,20 +69,62 @@ class TestScoreProblemSolving:
         assert result["score"] == 1
 
 
-class TestScoreCollaboration:
-    def test_strong_collaboration(self):
-        result = score_collaboration(
-            "We do pair programming, async code reviews on PRs, "
-            "and weekly retros to improve our process"
-        )
+class TestScoreWorkPreference:
+    def test_remote_flexible(self):
+        result = score_work_preference("I prefer remote but I'm flexible and open to hybrid")
         assert result["score"] == 5
+        assert "flexible" in result["rationale"]
 
-    def test_some_collaboration(self):
-        result = score_collaboration("We hold weekly retros with the team")
+    def test_hybrid_not_flexible(self):
+        result = score_work_preference("I need to be hybrid only, not flexible on that")
+        assert result["score"] == 3
+
+    def test_office_clear(self):
+        result = score_work_preference("I prefer working in the office")
+        assert result["score"] == 4
+        assert "in-office" in result["rationale"]
+
+    def test_unclear(self):
+        result = score_work_preference("I don't know really")
+        assert result["score"] == 1
+
+
+class TestScoreCurrentSalary:
+    def test_salary_with_k(self):
+        result = score_current_salary("I'm currently on about 85k")
+        assert result["score"] == 5
+        assert "85,000" in result["rationale"]
+
+    def test_salary_full_number(self):
+        result = score_current_salary("My salary is £65,000")
+        assert result["score"] == 5
+        assert "65,000" in result["rationale"]
+
+    def test_declined(self):
+        result = score_current_salary("I'd prefer not to say")
+        assert result["score"] == 3
+
+    def test_unclear(self):
+        result = score_current_salary("It varies a lot")
+        assert result["score"] == 1
+
+
+class TestScoreTargetSalary:
+    def test_target_with_k(self):
+        result = score_target_salary("I'm looking for at least 95k")
+        assert result["score"] == 5
+        assert "95,000" in result["rationale"]
+
+    def test_negotiable(self):
+        result = score_target_salary("I'm pretty open and flexible on salary")
         assert result["score"] == 4
 
-    def test_no_signals(self):
-        result = score_collaboration("I just work on my tasks independently")
+    def test_declined(self):
+        result = score_target_salary("I'd rather not say at this stage")
+        assert result["score"] == 3
+
+    def test_unclear(self):
+        result = score_target_salary("Hmm not sure")
         assert result["score"] == 1
 
 
@@ -112,11 +156,13 @@ class TestComputeOverall:
             "experience": {"score": 5, "rationale": ""},
             "tech_stack": {"score": 4, "rationale": ""},
             "problem_solving": {"score": 4, "rationale": ""},
-            "collaboration": {"score": 3, "rationale": ""},
+            "work_preference": {"score": 5, "rationale": ""},
             "availability": {"score": 5, "rationale": ""},
+            "current_salary": {"score": 5, "rationale": ""},
+            "target_salary": {"score": 5, "rationale": ""},
         }
         result = compute_overall(scores)
-        assert result["overall_score"] == 4.2
+        assert result["overall_score"] == 4.7
         assert result["overall_status"] == "pass"
 
     def test_flag(self):
@@ -124,11 +170,13 @@ class TestComputeOverall:
             "experience": {"score": 3, "rationale": ""},
             "tech_stack": {"score": 3, "rationale": ""},
             "problem_solving": {"score": 3, "rationale": ""},
-            "collaboration": {"score": 3, "rationale": ""},
+            "work_preference": {"score": 3, "rationale": ""},
             "availability": {"score": 2, "rationale": ""},
+            "current_salary": {"score": 3, "rationale": ""},
+            "target_salary": {"score": 3, "rationale": ""},
         }
         result = compute_overall(scores)
-        assert result["overall_score"] == 2.8
+        assert result["overall_score"] == 2.9
         assert result["overall_status"] == "flag"
 
     def test_fail(self):
@@ -136,36 +184,14 @@ class TestComputeOverall:
             "experience": {"score": 1, "rationale": ""},
             "tech_stack": {"score": 1, "rationale": ""},
             "problem_solving": {"score": 2, "rationale": ""},
-            "collaboration": {"score": 1, "rationale": ""},
+            "work_preference": {"score": 1, "rationale": ""},
             "availability": {"score": 1, "rationale": ""},
+            "current_salary": {"score": 1, "rationale": ""},
+            "target_salary": {"score": 1, "rationale": ""},
         }
         result = compute_overall(scores)
-        assert result["overall_score"] == 1.2
+        assert result["overall_score"] == 1.1
         assert result["overall_status"] == "fail"
-
-    def test_boundary_pass(self):
-        scores = {
-            "experience": {"score": 4, "rationale": ""},
-            "tech_stack": {"score": 3, "rationale": ""},
-            "problem_solving": {"score": 4, "rationale": ""},
-            "collaboration": {"score": 3, "rationale": ""},
-            "availability": {"score": 3, "rationale": ""},
-        }
-        result = compute_overall(scores)
-        assert result["overall_score"] == 3.4
-        assert result["overall_status"] == "flag"
-
-    def test_boundary_flag(self):
-        scores = {
-            "experience": {"score": 3, "rationale": ""},
-            "tech_stack": {"score": 2, "rationale": ""},
-            "problem_solving": {"score": 3, "rationale": ""},
-            "collaboration": {"score": 2, "rationale": ""},
-            "availability": {"score": 3, "rationale": ""},
-        }
-        result = compute_overall(scores)
-        assert result["overall_score"] == 2.6
-        assert result["overall_status"] == "flag"
 
 
 import os
@@ -202,8 +228,10 @@ VALID_PAYLOAD = {
         "experience": "I have 5 years of experience as a senior software engineer at a fintech startup",
         "tech_stack": "Python, TypeScript, React, PostgreSQL, Docker, AWS",
         "problem_solving": "We had a memory leak so I profiled the service, debugged the issue, tested a fix, and refactored the module",
-        "collaboration": "We do pair programming and async code reviews on PRs with weekly retros",
-        "availability": "I have a 1 month notice period"
+        "work_preference": "I prefer hybrid and I'm flexible on that",
+        "availability": "I can start in about 1 month",
+        "current_salary": "I'm currently on 85k",
+        "target_salary": "I'm looking for at least 95k"
     },
     "transcript": "Full transcript of the call..."
 }
@@ -224,8 +252,8 @@ class TestSubmitScreening:
         assert data["candidate_name"] == "Jane Smith"
         assert data["overall_status"] in ("pass", "flag", "fail")
         assert data["id"].startswith("SCR-")
-        assert len(data["scores"]) == 5
-        assert all(cat in data["scores"] for cat in ["experience", "tech_stack", "problem_solving", "collaboration", "availability"])
+        assert len(data["scores"]) == 7
+        assert all(cat in data["scores"] for cat in ["experience", "tech_stack", "problem_solving", "work_preference", "availability", "current_salary", "target_salary"])
         for cat_score in data["scores"].values():
             assert 1 <= cat_score["score"] <= 5
             assert isinstance(cat_score["rationale"], str)
@@ -281,8 +309,10 @@ RETELL_FUNCTION_PAYLOAD = {
         "answer_experience": "I have 6 years as a senior engineer",
         "answer_tech_stack": "Python, Go, PostgreSQL, Docker, Kubernetes",
         "answer_problem_solving": "I profiled and debugged a latency issue, then optimized the query layer",
-        "answer_collaboration": "Pair programming and code reviews are core to our team process",
-        "answer_availability": "I can start in 2 weeks"
+        "answer_work_preference": "I prefer remote but I'm open to hybrid, I'm flexible",
+        "answer_availability": "I can start in 2 weeks",
+        "answer_current_salary": "I'm on about 90k",
+        "answer_target_salary": "Looking for at least 100k"
     }
 }
 
@@ -295,7 +325,7 @@ class TestRetellFunctionRouting:
         assert data["candidate_name"] == "John Doe"
         assert data["id"].startswith("SCR-")
         assert data["overall_status"] in ("pass", "flag", "fail")
-        assert len(data["scores"]) == 5
+        assert len(data["scores"]) == 7
 
     def test_unknown_function(self):
         payload = {"name": "unknown_function", "call": {}, "args": {}}
@@ -353,8 +383,10 @@ class TestScoringThresholds:
                 "experience": "I have 8 years as a senior staff engineer at Google",
                 "tech_stack": "Python, TypeScript, React, PostgreSQL, Docker, AWS, Kubernetes",
                 "problem_solving": "I profiled the service, debugged a memory leak, tested the fix, refactored the module, and optimized the query path",
-                "collaboration": "We do pair programming, async code reviews, and weekly retros with the team",
-                "availability": "I can start immediately"
+                "work_preference": "I prefer hybrid but I'm flexible and open to anything",
+                "availability": "I can start immediately",
+                "current_salary": "I'm on 95k",
+                "target_salary": "Looking for at least 110k"
             },
             "transcript": "strong candidate transcript"
         }
@@ -373,8 +405,10 @@ class TestScoringThresholds:
                 "experience": "I like computers",
                 "tech_stack": "I use Fortran",
                 "problem_solving": "Things were hard but I managed",
-                "collaboration": "I work alone",
-                "availability": "Not sure really"
+                "work_preference": "I dunno",
+                "availability": "Not sure really",
+                "current_salary": "Not sure",
+                "target_salary": "Dunno"
             },
             "transcript": "weak candidate transcript"
         }
@@ -393,8 +427,10 @@ class TestScoringThresholds:
                 "experience": "I have 2 years as a developer",
                 "tech_stack": "Python and JavaScript",
                 "problem_solving": "I debugged an issue in production",
-                "collaboration": "I work with a team",
-                "availability": "I have a 3 month notice period"
+                "work_preference": "I prefer remote only, not flexible",
+                "availability": "I have a 3 month notice period",
+                "current_salary": "I'd prefer not to say",
+                "target_salary": "It depends on the role"
             },
             "transcript": "mixed candidate transcript"
         }

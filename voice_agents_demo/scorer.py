@@ -111,33 +111,85 @@ def score_problem_solving(answer: str) -> dict:
     return {"score": score, "rationale": rationale}
 
 
-COLLABORATION_KEYWORDS = [
-    "pair", "pairing", "pair programming",
-    "review", "code review", "pr", "pull request",
-    "stand-up", "standup", "retro", "retrospective",
-    "async", "sync",
-    "mentor", "mentoring",
-    "team", "mob programming",
-]
-
-
-def score_collaboration(answer: str) -> dict:
-    """Score collaboration answer by counting collaboration keywords."""
+def score_work_preference(answer: str) -> dict:
+    """Score work preference — extracts preference and flexibility."""
     text = answer.lower()
-    found = [kw for kw in COLLABORATION_KEYWORDS if kw in text]
-    count = len(set(found))
 
-    if count >= 3:
-        score = 5
-    elif count >= 2:
-        score = 4
-    elif count >= 1:
-        score = 3
-    else:
+    preference = "unclear"
+    if any(kw in text for kw in ["remote", "from home", "work from home", "wfh"]):
+        preference = "remote"
+    elif any(kw in text for kw in ["hybrid", "mix", "split", "few days"]):
+        preference = "hybrid"
+    elif any(kw in text for kw in ["office", "in-office", "on-site", "onsite", "in person"]):
+        preference = "in-office"
+
+    flexible = "unknown"
+    # Check negative flexibility FIRST (before positive, since "not flexible" contains "flexible")
+    if any(kw in text for kw in ["not flexible", "no flexibility", "only", "must be", "need to be", "strictly"]):
+        flexible = "no"
+    elif any(kw in text for kw in ["flexible", "open to", "don't mind", "happy to", "either", "any", "adaptable"]):
+        flexible = "yes"
+
+    if preference == "unclear":
         score = 1
+        rationale = "Work preference unclear"
+    elif flexible == "yes":
+        score = 5
+        rationale = f"Prefers {preference}, flexible"
+    elif flexible == "no":
+        score = 3
+        rationale = f"Prefers {preference}, not flexible"
+    else:
+        score = 4
+        rationale = f"Prefers {preference}, flexibility unknown"
 
-    rationale = f"{count} collaboration keywords" if count > 0 else "No collaboration signals detected"
     return {"score": score, "rationale": rationale}
+
+
+def score_current_salary(answer: str) -> dict:
+    """Extract current salary from answer."""
+    text = answer.lower()
+
+    # Match patterns like £50k, £50,000, 50k, 50000, £50
+    salary = _extract_salary(text)
+
+    if salary:
+        return {"score": 5, "rationale": f"Current salary: £{salary:,}"}
+    elif any(kw in text for kw in ["prefer not", "rather not", "confidential", "private"]):
+        return {"score": 3, "rationale": "Declined to share current salary"}
+    else:
+        return {"score": 1, "rationale": "Current salary unclear"}
+
+
+def score_target_salary(answer: str) -> dict:
+    """Extract target/minimum salary from answer."""
+    text = answer.lower()
+
+    salary = _extract_salary(text)
+
+    if salary:
+        return {"score": 5, "rationale": f"Target floor salary: £{salary:,}"}
+    elif any(kw in text for kw in ["negotiable", "open", "flexible", "depends"]):
+        return {"score": 4, "rationale": "Target salary negotiable/open"}
+    elif any(kw in text for kw in ["prefer not", "rather not", "confidential", "private"]):
+        return {"score": 3, "rationale": "Declined to share target salary"}
+    else:
+        return {"score": 1, "rationale": "Target salary unclear"}
+
+
+def _extract_salary(text: str) -> int:
+    """Extract a salary figure from text. Returns int or 0 if not found."""
+    # £80,000 or 80,000 or £80000 or 80000
+    match = re.search(r'[£$]?\s*(\d{2,3})[,.]?(\d{3})', text)
+    if match:
+        return int(match.group(1) + match.group(2))
+
+    # 80k or £80k
+    match = re.search(r'[£$]?\s*(\d{2,3})\s*k\b', text)
+    if match:
+        return int(match.group(1)) * 1000
+
+    return 0
 
 
 def score_availability(answer: str) -> dict:
