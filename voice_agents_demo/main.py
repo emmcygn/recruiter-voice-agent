@@ -223,6 +223,9 @@ async def retell_custom_function(request: Request):
     return {"error": f"Unknown function: {fn_name}"}
 
 
+# Import webhook_handler to register its routes on the app
+import webhook_handler  # noqa: F401
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
