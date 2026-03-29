@@ -166,3 +166,239 @@ class TestComputeOverall:
         result = compute_overall(scores)
         assert result["overall_score"] == 2.6
         assert result["overall_status"] == "flag"
+
+
+import os
+import json
+from fastapi.testclient import TestClient
+
+# Ensure DEMO_MODE is off for most tests
+os.environ["DEMO_MODE"] = "false"
+
+from main import app, DATA_FILE
+
+# Import webhook_handler to register its routes on the app
+import webhook_handler  # noqa: F401
+
+client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def clean_data_file():
+    """Remove screenings.json before and after each test."""
+    if os.path.exists(DATA_FILE):
+        os.remove(DATA_FILE)
+    yield
+    if os.path.exists(DATA_FILE):
+        os.remove(DATA_FILE)
+
+
+VALID_PAYLOAD = {
+    "candidate_name": "Jane Smith",
+    "candidate_phone": "07123456789",
+    "role_applied": "software_engineer",
+    "consent_given": True,
+    "answers": {
+        "experience": "I have 5 years of experience as a senior software engineer at a fintech startup",
+        "tech_stack": "Python, TypeScript, React, PostgreSQL, Docker, AWS",
+        "problem_solving": "We had a memory leak so I profiled the service, debugged the issue, tested a fix, and refactored the module",
+        "collaboration": "We do pair programming and async code reviews on PRs with weekly retros",
+        "availability": "I have a 1 month notice period"
+    },
+    "transcript": "Full transcript of the call..."
+}
+
+
+class TestHealthEndpoint:
+    def test_health(self):
+        response = client.get("/health")
+        assert response.status_code == 200
+        assert response.json() == {"status": "ok"}
+
+
+class TestSubmitScreening:
+    def test_valid_submission(self):
+        response = client.post("/submit-screening", json=VALID_PAYLOAD)
+        assert response.status_code == 200
+        data = response.json()
+        assert data["candidate_name"] == "Jane Smith"
+        assert data["overall_status"] in ("pass", "flag", "fail")
+        assert data["id"].startswith("SCR-")
+        assert len(data["scores"]) == 5
+        assert all(cat in data["scores"] for cat in ["experience", "tech_stack", "problem_solving", "collaboration", "availability"])
+        for cat_score in data["scores"].values():
+            assert 1 <= cat_score["score"] <= 5
+            assert isinstance(cat_score["rationale"], str)
+
+    def test_missing_fields(self):
+        bad_payload = {"candidate_name": "Jane"}
+        response = client.post("/submit-screening", json=bad_payload)
+        assert response.status_code == 422
+
+    def test_no_consent(self):
+        payload = {**VALID_PAYLOAD, "consent_given": False}
+        response = client.post("/submit-screening", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+        assert data["overall_status"] == "rejected"
+        assert data["overall_score"] == 0
+        assert data["scores"] == {}
+
+
+class TestScreeningsEndpoints:
+    def test_list_screenings(self):
+        client.post("/submit-screening", json=VALID_PAYLOAD)
+        response = client.get("/screenings")
+        assert response.status_code == 200
+        data = response.json()
+        assert isinstance(data, list)
+        assert len(data) >= 1
+        assert data[0]["candidate_name"] == "Jane Smith"
+
+    def test_get_screening_by_id(self):
+        submit_resp = client.post("/submit-screening", json=VALID_PAYLOAD)
+        screening_id = submit_resp.json()["id"]
+        response = client.get(f"/screenings/{screening_id}")
+        assert response.status_code == 200
+        assert response.json()["id"] == screening_id
+
+    def test_get_screening_not_found(self):
+        response = client.get("/screenings/SCR-ZZZZZ")
+        assert response.status_code == 404
+
+
+RETELL_FUNCTION_PAYLOAD = {
+    "name": "submit_screening",
+    "call": {
+        "call_id": "test-call-123",
+        "transcript": "Agent: Hello... Candidate: Hi..."
+    },
+    "args": {
+        "candidate_name": "John Doe",
+        "candidate_phone": "07987654321",
+        "role_applied": "software_engineer",
+        "consent_given": "true",
+        "answer_experience": "I have 6 years as a senior engineer",
+        "answer_tech_stack": "Python, Go, PostgreSQL, Docker, Kubernetes",
+        "answer_problem_solving": "I profiled and debugged a latency issue, then optimized the query layer",
+        "answer_collaboration": "Pair programming and code reviews are core to our team process",
+        "answer_availability": "I can start in 2 weeks"
+    }
+}
+
+
+class TestRetellFunctionRouting:
+    def test_submit_screening_via_retell(self):
+        response = client.post("/retell/function", json=RETELL_FUNCTION_PAYLOAD)
+        assert response.status_code == 200
+        data = response.json()
+        assert data["candidate_name"] == "John Doe"
+        assert data["id"].startswith("SCR-")
+        assert data["overall_status"] in ("pass", "flag", "fail")
+        assert len(data["scores"]) == 5
+
+    def test_unknown_function(self):
+        payload = {"name": "unknown_function", "call": {}, "args": {}}
+        response = client.post("/retell/function", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+        assert "error" in data
+
+
+class TestWebhook:
+    def test_call_ended_webhook(self):
+        webhook_payload = {
+            "event": "call_ended",
+            "call": {
+                "call_id": "webhook-test-123",
+                "transcript": "Test transcript from webhook",
+                "start_timestamp": 1714608475945,
+                "end_timestamp": 1714608491736
+            }
+        }
+        response = client.post("/webhook/retell", json=webhook_payload)
+        assert response.status_code == 200
+        assert response.json()["status"] == "ok"
+
+
+class TestDemoMode:
+    def test_demo_mode_deterministic(self):
+        import main
+        original = main.DEMO_MODE
+        main.DEMO_MODE = True
+
+        try:
+            resp1 = client.post("/submit-screening", json=VALID_PAYLOAD)
+            resp2 = client.post("/submit-screening", json=VALID_PAYLOAD)
+            data1 = resp1.json()
+            data2 = resp2.json()
+
+            assert data1["id"] == data2["id"]
+            assert data1["overall_status"] == "pass"
+            assert data2["overall_status"] == "pass"
+            assert data1["scores"] == data2["scores"]
+            assert data1["demo_mode"] is True
+        finally:
+            main.DEMO_MODE = original
+
+
+class TestScoringThresholds:
+    def test_strong_candidate_passes(self):
+        payload = {
+            "candidate_name": "Strong Candidate",
+            "candidate_phone": "07111111111",
+            "role_applied": "software_engineer",
+            "consent_given": True,
+            "answers": {
+                "experience": "I have 8 years as a senior staff engineer at Google",
+                "tech_stack": "Python, TypeScript, React, PostgreSQL, Docker, AWS, Kubernetes",
+                "problem_solving": "I profiled the service, debugged a memory leak, tested the fix, refactored the module, and optimized the query path",
+                "collaboration": "We do pair programming, async code reviews, and weekly retros with the team",
+                "availability": "I can start immediately"
+            },
+            "transcript": "strong candidate transcript"
+        }
+        response = client.post("/submit-screening", json=payload)
+        data = response.json()
+        assert data["overall_status"] == "pass"
+        assert data["overall_score"] >= 3.5
+
+    def test_weak_candidate_fails(self):
+        payload = {
+            "candidate_name": "Weak Candidate",
+            "candidate_phone": "07222222222",
+            "role_applied": "software_engineer",
+            "consent_given": True,
+            "answers": {
+                "experience": "I like computers",
+                "tech_stack": "I use Fortran",
+                "problem_solving": "Things were hard but I managed",
+                "collaboration": "I work alone",
+                "availability": "Not sure really"
+            },
+            "transcript": "weak candidate transcript"
+        }
+        response = client.post("/submit-screening", json=payload)
+        data = response.json()
+        assert data["overall_status"] == "fail"
+        assert data["overall_score"] < 2.5
+
+    def test_mixed_candidate_flags(self):
+        payload = {
+            "candidate_name": "Mixed Candidate",
+            "candidate_phone": "07333333333",
+            "role_applied": "software_engineer",
+            "consent_given": True,
+            "answers": {
+                "experience": "I have 2 years as a developer",
+                "tech_stack": "Python and JavaScript",
+                "problem_solving": "I debugged an issue in production",
+                "collaboration": "I work with a team",
+                "availability": "I have a 3 month notice period"
+            },
+            "transcript": "mixed candidate transcript"
+        }
+        response = client.post("/submit-screening", json=payload)
+        data = response.json()
+        assert data["overall_status"] == "flag"
+        assert 2.5 <= data["overall_score"] < 3.5

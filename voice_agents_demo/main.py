@@ -1,22 +1,28 @@
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import Dict, Optional
 import json
 import uuid
 from datetime import datetime, timezone
 import os
-import random
 import hashlib
 import logging
-from cal_client import CalClient
+
+from scorer import (
+    score_experience,
+    score_tech_stack,
+    score_problem_solving,
+    score_collaboration,
+    score_availability,
+    compute_overall,
+)
 
 logger = logging.getLogger(__name__)
 
 DEMO_MODE = os.environ.get("DEMO_MODE", "false").lower() == "true"
 
-app = FastAPI(title="SwitchedOn Booking API", version="1.0.0")
-cal_client = CalClient()
+app = FastAPI(title="Talent Screening API", version="1.0.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -26,164 +32,166 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-class BookingSlots(BaseModel):
-    full_name: str
-    phone_number: str
-    service_type: str
-    postcode: Optional[str] = None
-    preferred_times: List[str]
 
-class BookingRequest(BaseModel):
-    intent: str
-    slots: BookingSlots
-    transcript: str
-    confidence: float
+# --- Models ---
 
-class BookingResponse(BaseModel):
-    status: str
-    booking_reference: Optional[str] = None
-    scheduled_time: Optional[str] = None
-    reason: Optional[str] = None
+class ScreeningAnswers(BaseModel):
+    experience: str
+    tech_stack: str
+    problem_solving: str
+    collaboration: str
+    availability: str
 
-class CallRecord(BaseModel):
+
+class ScreeningSubmission(BaseModel):
+    candidate_name: str
+    candidate_phone: str
+    role_applied: str = "software_engineer"
+    consent_given: bool
+    answers: ScreeningAnswers
+    transcript: str = ""
+
+
+class ScoreDetail(BaseModel):
+    score: int
+    rationale: str
+
+
+class ScreeningScorecard(BaseModel):
     id: str
     timestamp: str
+    candidate_name: str
+    candidate_phone: str
+    role_applied: str
+    consent_given: bool
+    overall_status: str
+    overall_score: float
+    scores: Dict[str, ScoreDetail]
     transcript: str
-    intent: str
-    slots: dict
-    backend_response: dict
-    success: bool
-    escalation_flag: bool = False
     demo_mode: bool = False
-    call_metadata: Optional[dict] = None
 
-DATA_FILE = "calls.json"
 
-def load_calls():
+# --- Persistence ---
+
+DATA_FILE = "screenings.json"
+
+
+def load_screenings():
     if not os.path.exists(DATA_FILE):
         return []
     try:
-        with open(DATA_FILE, 'r') as f:
+        with open(DATA_FILE, "r") as f:
             return json.load(f)
-    except:
+    except (json.JSONDecodeError, IOError):
         return []
 
-def save_calls(calls):
-    with open(DATA_FILE, 'w') as f:
-        json.dump(calls, f, indent=2)
 
-def generate_booking_reference(seed: str = ""):
+def save_screenings(screenings):
+    with open(DATA_FILE, "w") as f:
+        json.dump(screenings, f, indent=2)
+
+
+def generate_screening_id(seed: str = "") -> str:
     if DEMO_MODE and seed:
         hash_hex = hashlib.md5(seed.encode()).hexdigest()[:5].upper()
-        return f"SWO-{hash_hex}"
-    return f"SWO-{uuid.uuid4().hex[:5].upper()}"
+        return f"SCR-{hash_hex}"
+    return f"SCR-{uuid.uuid4().hex[:5].upper()}"
+
+
+# --- Endpoints ---
 
 @app.get("/health")
 async def health_check():
     return {"status": "ok"}
 
-@app.get("/calls", response_model=List[CallRecord])
-async def get_calls():
-    calls = load_calls()
-    return calls
 
-@app.post("/attempt-booking", response_model=BookingResponse)
-async def attempt_booking(request: BookingRequest):
-    calls = load_calls()
-    
-    # Validate required slots
-    required_slots = ["full_name", "phone_number", "service_type"]
-    missing_slots = [slot for slot in required_slots if not getattr(request.slots, slot, None)]
-    
-    if missing_slots:
-        response = {
-            "status": "unavailable",
-            "reason": f"Missing required information: {', '.join(missing_slots)}"
+@app.post("/submit-screening", response_model=ScreeningScorecard)
+async def submit_screening(submission: ScreeningSubmission):
+    screening_id = generate_screening_id(seed=submission.candidate_name)
+
+    if not submission.consent_given:
+        scorecard = {
+            "id": screening_id,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "candidate_name": submission.candidate_name,
+            "candidate_phone": submission.candidate_phone,
+            "role_applied": submission.role_applied,
+            "consent_given": False,
+            "overall_status": "rejected",
+            "overall_score": 0,
+            "scores": {},
+            "transcript": submission.transcript,
+            "demo_mode": DEMO_MODE,
         }
-    elif not request.slots.preferred_times:
-        response = {
-            "status": "unavailable", 
-            "reason": "No preferred time provided"
+    elif DEMO_MODE:
+        scorecard = {
+            "id": screening_id,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "candidate_name": submission.candidate_name,
+            "candidate_phone": submission.candidate_phone,
+            "role_applied": submission.role_applied,
+            "consent_given": True,
+            "overall_status": "pass",
+            "overall_score": 4.6,
+            "scores": {
+                "experience": {"score": 5, "rationale": "Senior-level, 5+ years"},
+                "tech_stack": {"score": 5, "rationale": "5+ matching technologies"},
+                "problem_solving": {"score": 4, "rationale": "Clear methodology described"},
+                "collaboration": {"score": 4, "rationale": "Strong collaboration signals"},
+                "availability": {"score": 5, "rationale": "Available within 1 month"},
+            },
+            "transcript": submission.transcript,
+            "demo_mode": True,
         }
     else:
-        if DEMO_MODE:
-            # Deterministic: always succeed in demo mode
-            seed = f"{request.slots.full_name}-{request.slots.preferred_times[0]}"
-            booking_ref = generate_booking_reference(seed=seed)
-            scheduled_time = request.slots.preferred_times[0]
-            response = {
-                "status": "confirmed",
-                "booking_reference": booking_ref,
-                "scheduled_time": scheduled_time
-            }
-        else:
-            # Try Cal.com integration if configured
-            if cal_client.api_key and cal_client.event_type_id:
-                # Generate placeholder email from phone number if not provided
-                email = f"{request.slots.phone_number.replace(' ', '')}@placeholder.com"
-                scheduled_time = request.slots.preferred_times[0]
+        scores = {
+            "experience": score_experience(submission.answers.experience),
+            "tech_stack": score_tech_stack(submission.answers.tech_stack),
+            "problem_solving": score_problem_solving(submission.answers.problem_solving),
+            "collaboration": score_collaboration(submission.answers.collaboration),
+            "availability": score_availability(submission.answers.availability),
+        }
+        overall = compute_overall(scores)
+        scorecard = {
+            "id": screening_id,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "candidate_name": submission.candidate_name,
+            "candidate_phone": submission.candidate_phone,
+            "role_applied": submission.role_applied,
+            "consent_given": True,
+            "overall_status": overall["overall_status"],
+            "overall_score": overall["overall_score"],
+            "scores": scores,
+            "transcript": submission.transcript,
+            "demo_mode": False,
+        }
 
-                cal_booking_uid = await cal_client.create_booking(
-                    full_name=request.slots.full_name,
-                    email=email,
-                    start_time=scheduled_time,
-                    phone=request.slots.phone_number
-                )
+    screenings = load_screenings()
+    screenings.append(scorecard)
+    save_screenings(screenings)
 
-                if cal_booking_uid:
-                    # Cal.com booking successful
-                    response = {
-                        "status": "confirmed",
-                        "booking_reference": f"SWO-{cal_booking_uid[:5].upper()}",
-                        "scheduled_time": scheduled_time
-                    }
-                else:
-                    # Cal.com booking failed, fall back to unavailable
-                    response = {
-                        "status": "unavailable",
-                        "reason": "Unable to confirm booking at requested time"
-                    }
-            else:
-                # No Cal.com configured - simulate booking logic with 80% success rate
-                if random.random() > 0.2:
-                    booking_ref = generate_booking_reference()
-                    scheduled_time = request.slots.preferred_times[0]
-                    response = {
-                        "status": "confirmed",
-                        "booking_reference": booking_ref,
-                        "scheduled_time": scheduled_time
-                    }
-                else:
-                    response = {
-                        "status": "unavailable",
-                        "reason": "No availability at requested times"
-                    }
+    return ScreeningScorecard(**scorecard)
 
-    # Store call record
-    call_record = {
-        "id": str(uuid.uuid4()),
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "transcript": request.transcript,
-        "intent": request.intent,
-        "slots": request.slots.model_dump(),
-        "backend_response": response,
-        "success": response["status"] == "confirmed",
-        "escalation_flag": request.intent == "escalate",
-        "demo_mode": DEMO_MODE
-    }
-    
-    calls.append(call_record)
-    save_calls(calls)
-    
-    return BookingResponse(**response)
+
+@app.get("/screenings")
+async def list_screenings():
+    return load_screenings()
+
+
+@app.get("/screenings/{screening_id}")
+async def get_screening(screening_id: str):
+    screenings = load_screenings()
+    for s in screenings:
+        if s["id"] == screening_id:
+            return s
+    raise HTTPException(status_code=404, detail="Screening not found")
+
 
 @app.post("/retell/function")
 async def retell_custom_function(request: Request):
     """
     Retell Custom Function handler.
-    Called during a live call when the agent invokes a tool.
-    Retell sends: {"name": "...", "call": {...}, "args": {...}}
-    We return JSON that Retell relays to the agent as text.
+    Routes by function name. Currently supports: submit_screening.
     """
     body = await request.json()
     logger.info(f"Retell custom function call: {json.dumps(body, indent=2)}")
@@ -192,33 +200,27 @@ async def retell_custom_function(request: Request):
     args = body.get("args", {})
     call_info = body.get("call", {})
 
-    if fn_name != "book_appointment":
-        return {"error": f"Unknown function: {fn_name}"}
+    if fn_name == "submit_screening":
+        consent_raw = args.get("consent_given", "false")
+        consent = consent_raw.lower() in ("true", "yes", "1") if isinstance(consent_raw, str) else bool(consent_raw)
 
-    # Build a BookingRequest from the function args
-    preferred_times_raw = args.get("preferred_times", "")
-    # Retell may send preferred_times as a comma-separated string; split and clean
-    if isinstance(preferred_times_raw, str):
-        parts = [t.strip() for t in preferred_times_raw.split(",") if t.strip()]
-        preferred_times = parts if parts else []
-    else:
-        preferred_times = preferred_times_raw
+        submission = ScreeningSubmission(
+            candidate_name=args.get("candidate_name", ""),
+            candidate_phone=args.get("candidate_phone", ""),
+            role_applied=args.get("role_applied", "software_engineer"),
+            consent_given=consent,
+            answers={
+                "experience": args.get("answer_experience", ""),
+                "tech_stack": args.get("answer_tech_stack", ""),
+                "problem_solving": args.get("answer_problem_solving", ""),
+                "collaboration": args.get("answer_collaboration", ""),
+                "availability": args.get("answer_availability", ""),
+            },
+            transcript=call_info.get("transcript", ""),
+        )
+        return await submit_screening(submission)
 
-    booking_request = BookingRequest(
-        intent="book",
-        slots={
-            "full_name": args.get("full_name", ""),
-            "phone_number": args.get("phone_number", ""),
-            "service_type": args.get("service_type", ""),
-            "postcode": args.get("postcode"),
-            "preferred_times": preferred_times,
-        },
-        transcript=call_info.get("transcript", ""),
-        confidence=0.9,
-    )
-
-    response = await attempt_booking(booking_request)
-    return response
+    return {"error": f"Unknown function: {fn_name}"}
 
 
 if __name__ == "__main__":
